@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xsukax Cryptographic Hash Generator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Verdana, Geneva, sans-serif; font-size: 10pt; background: #f6f6ef; color: #000; line-height: 1.4; }
+        .container { max-width: 1400px; margin: 0 auto; background: #f6f6ef; }
+        .header { background: #ff6600; padding: 4px; }
+        .header-content { display: flex; align-items: center; gap: 8px; }
+        .logo { font-weight: bold; font-size: 11pt; color: #fff; padding: 2px 4px; }
+        .title { font-size: 11pt; color: #000; font-weight: bold; }
+        .subtitle { font-size: 8pt; color: #828282; margin-left: 8px; }
+        .main { padding: 12px; }
+        .section { background: #fff; border: 1px solid #ff6600; margin-bottom: 12px; }
+        .section-title { background: #f6f6ef; padding: 6px 8px; font-weight: bold; border-bottom: 1px solid #ff6600; font-size: 10pt; }
+        .section-content { padding: 8px; }
+        textarea { width: 100%; padding: 6px; border: 1px solid #ccc; font-family: monospace; font-size: 9pt; resize: vertical; }
+        .hash-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .hash-table th { background: #f6f6ef; padding: 6px 8px; text-align: left; border: 1px solid #ccc; font-size: 9pt; font-weight: bold; }
+        .hash-table td { padding: 6px 8px; border: 1px solid #ccc; font-size: 9pt; }
+        .hash-table tr:hover { background: #fffbcc; }
+        .hash-output { font-family: monospace; word-break: break-all; font-size: 8pt; }
+        .copy-btn { padding: 2px 6px; background: #ff6600; color: #fff; border: none; cursor: pointer; font-size: 8pt; }
+        .copy-btn:hover { background: #f60; }
+        .category { color: #828282; font-size: 8pt; }
+        .warning { color: #c00; font-weight: bold; }
+        .btn { padding: 4px 8px; background: #ff6600; color: #fff; border: none; cursor: pointer; font-size: 9pt; margin-right: 4px; }
+        .btn:hover { background: #f60; }
+        .notification { position: fixed; top: 8px; right: 8px; background: #fff; border: 2px solid #ff6600; padding: 6px 12px; font-size: 9pt; display: none; z-index: 1000; }
+        .notification.show { display: block; }
+        .footer { text-align: center; padding: 12px; font-size: 8pt; color: #828282; }
+        .spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid #f6f6ef; border-top-color: #ff6600; border-radius: 50%; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .status { font-size: 8pt; color: #828282; margin-top: 4px; }
+        .config-section { background: #fff; border: 1px solid #ff6600; margin-bottom: 12px; padding: 8px; }
+        .config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+        .config-card { background: #f6f6ef; border: 1px solid #ccc; padding: 8px; }
+        .config-title { font-weight: bold; margin-bottom: 6px; font-size: 9pt; }
+        .param-row { margin-bottom: 4px; font-size: 8pt; }
+        .param-label { display: inline-block; width: 100px; }
+        .param-input { width: 80px; padding: 2px 4px; border: 1px solid #ccc; font-size: 8pt; }
+        .config-output { background: #fff; border: 1px solid #ccc; padding: 6px; font-family: monospace; font-size: 8pt; word-break: break-all; margin-top: 6px; min-height: 40px; }
+        .config-actions { margin-top: 6px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <span class="logo">xsukax</span>
+                <span class="title">Cryptographic Hash Generator</span>
+                <span class="subtitle">Client-side • Real-time • All hashes at once</span>
+            </div>
+        </div>
+
+        <div class="main">
+            <div class="section">
+                <div class="section-title">Input Text</div>
+                <div class="section-content">
+                    <textarea id="inputText" rows="5" placeholder="Type or paste text here... All hashes update automatically"></textarea>
+                    <div class="status" id="status">Ready • 0 characters</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Instant Hashes (No Configuration Required)</div>
+                <div class="section-content">
+                    <table class="hash-table" id="hashTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 140px;">Algorithm</th>
+                                <th style="width: 80px;">Category</th>
+                                <th>Hash Output</th>
+                                <th style="width: 60px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hashTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Configurable Hashes (Require Parameters)</div>
+                <div class="section-content">
+                    <div class="config-grid" id="configGrid"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            All computations performed locally. No data transmitted externally.
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/hash-wasm@4.11.0/dist/index.umd.min.js"></script>
+    <script>
+        const { 
+            md5, sha1, sha224, sha256, sha384, sha512,
+            sha3, ripemd160, whirlpool,
+            blake2b, blake2s, blake3,
+            argon2id, argon2i, argon2d,
+            bcrypt, scrypt
+        } = hashwasm;
+
+        // Instant hash algorithms (no parameters)
+        const instantAlgorithms = {
+            'MD5': { fn: md5, category: 'Legacy', warning: true },
+            'SHA-1': { fn: sha1, category: 'Legacy', warning: true },
+            'SHA-224': { fn: sha224, category: 'SHA-2' },
+            'SHA-256': { fn: sha256, category: 'SHA-2' },
+            'SHA-384': { fn: sha384, category: 'SHA-2' },
+            'SHA-512': { fn: sha512, category: 'SHA-2' },
+            'SHA3-224': { fn: (d) => sha3(d, 224), category: 'SHA-3' },
+            'SHA3-256': { fn: (d) => sha3(d, 256), category: 'SHA-3' },
+            'SHA3-384': { fn: (d) => sha3(d, 384), category: 'SHA-3' },
+            'SHA3-512': { fn: (d) => sha3(d, 512), category: 'SHA-3' },
+            'RIPEMD-160': { fn: ripemd160, category: 'Other' },
+            'Whirlpool': { fn: whirlpool, category: 'Other' },
+            'BLAKE2b': { fn: (d) => blake2b(d, 512), category: 'BLAKE' },
+            'BLAKE2s': { fn: (d) => blake2s(d, 256), category: 'BLAKE' },
+            'BLAKE3': { fn: blake3, category: 'BLAKE' }
+        };
+
+        // Configurable algorithms (require parameters)
+        const configurableAlgorithms = {
+            'bcrypt': {
+                fn: 'bcrypt',
+                params: { cost: { label: 'Cost Factor', value: 8, min: 4, max: 12 } },
+                note: 'Blowfish-based password hashing'
+            },
+            'scrypt': {
+                fn: 'scrypt',
+                params: {
+                    N: { label: 'N (CPU)', value: 1024, min: 2, max: 16384 },
+                    r: { label: 'r (Memory)', value: 8, min: 1, max: 16 },
+                    p: { label: 'p (Parallel)', value: 1, min: 1, max: 4 }
+                },
+                note: 'Memory-hard password hashing'
+            },
+            'Argon2id': {
+                fn: 'argon2id',
+                params: {
+                    iterations: { label: 'Iterations', value: 3, min: 1, max: 10 },
+                    memory: { label: 'Memory (KB)', value: 512, min: 8, max: 4096 },
+                    parallelism: { label: 'Parallelism', value: 1, min: 1, max: 4 }
+                },
+                note: 'Recommended password hashing'
+            },
+            'Argon2i': {
+                fn: 'argon2i',
+                params: {
+                    iterations: { label: 'Iterations', value: 3, min: 1, max: 10 },
+                    memory: { label: 'Memory (KB)', value: 512, min: 8, max: 4096 },
+                    parallelism: { label: 'Parallelism', value: 1, min: 1, max: 4 }
+                },
+                note: 'Side-channel resistant'
+            },
+            'Argon2d': {
+                fn: 'argon2d',
+                params: {
+                    iterations: { label: 'Iterations', value: 3, min: 1, max: 10 },
+                    memory: { label: 'Memory (KB)', value: 512, min: 8, max: 4096 },
+                    parallelism: { label: 'Parallelism', value: 1, min: 1, max: 4 }
+                },
+                note: 'GPU-resistant'
+            }
+        };
+
+        let isHashing = false;
+
+        function initializeTables() {
+            const tbody = document.getElementById('hashTableBody');
+            
+            // Create rows for instant hashes
+            Object.keys(instantAlgorithms).forEach(algo => {
+                const algoData = instantAlgorithms[algo];
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>
+                        ${algoData.warning ? '<span class="warning">⚠</span> ' : ''}
+                        <strong>${algo}</strong>
+                    </td>
+                    <td class="category">${algoData.category}</td>
+                    <td class="hash-output" id="hash_${algo}">-</td>
+                    <td><button class="copy-btn" onclick="copyHash('${algo}')">Copy</button></td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Create cards for configurable hashes
+            const configGrid = document.getElementById('configGrid');
+            Object.keys(configurableAlgorithms).forEach(algo => {
+                const algoData = configurableAlgorithms[algo];
+                const card = document.createElement('div');
+                card.className = 'config-card';
+                
+                let paramsHTML = '';
+                Object.keys(algoData.params).forEach(param => {
+                    const config = algoData.params[param];
+                    paramsHTML += `
+                        <div class="param-row">
+                            <span class="param-label">${config.label}:</span>
+                            <input type="number" id="param_${algo}_${param}" class="param-input" 
+                                value="${config.value}" min="${config.min}" max="${config.max}"
+                                onchange="hashConfigurable('${algo}')">
+                        </div>
+                    `;
+                });
+
+                card.innerHTML = `
+                    <div class="config-title">${algo}</div>
+                    <div style="font-size: 8pt; color: #828282; margin-bottom: 6px;">${algoData.note}</div>
+                    ${paramsHTML}
+                    <div class="config-actions">
+                        <button class="copy-btn" onclick="hashConfigurable('${algo}')">Generate Hash</button>
+                        <button class="copy-btn" onclick="copyConfigHash('${algo}')">Copy</button>
+                    </div>
+                    <div class="config-output" id="config_${algo}">Click "Generate Hash" to compute</div>
+                `;
+                configGrid.appendChild(card);
+            });
+        }
+
+        async function hashAllInstant() {
+            const input = document.getElementById('inputText').value;
+            const status = document.getElementById('status');
+            
+            status.textContent = `Computing ${Object.keys(instantAlgorithms).length} hashes... • ${input.length} characters`;
+
+            if (!input) {
+                Object.keys(instantAlgorithms).forEach(algo => {
+                    document.getElementById(`hash_${algo}`).textContent = '-';
+                });
+                status.textContent = 'Ready • 0 characters';
+                return;
+            }
+
+            // Hash all algorithms in parallel
+            const promises = Object.keys(instantAlgorithms).map(async (algo) => {
+                try {
+                    const algoData = instantAlgorithms[algo];
+                    const result = await algoData.fn(input);
+                    document.getElementById(`hash_${algo}`).textContent = result;
+                } catch (error) {
+                    document.getElementById(`hash_${algo}`).textContent = 'Error';
+                    console.error(`${algo} error:`, error);
+                }
+            });
+
+            await Promise.all(promises);
+            status.textContent = `All hashes computed • ${input.length} characters`;
+        }
+
+        async function hashConfigurable(algo) {
+            const input = document.getElementById('inputText').value;
+            if (!input) {
+                showNotification('Enter text first');
+                return;
+            }
+
+            const outputEl = document.getElementById(`config_${algo}`);
+            outputEl.innerHTML = '<span class="spinner"></span> Computing...';
+
+            try {
+                const algoData = configurableAlgorithms[algo];
+                let result;
+
+                if (algo === 'bcrypt') {
+                    const cost = parseInt(document.getElementById(`param_${algo}_cost`).value) || 8;
+                    const salt = new Uint8Array(16);
+                    crypto.getRandomValues(salt);
+                    result = await bcrypt({
+                        password: input,
+                        salt: salt,
+                        costFactor: cost,
+                        outputType: 'encoded'
+                    });
+                } else if (algo === 'scrypt') {
+                    const N = parseInt(document.getElementById(`param_${algo}_N`).value) || 1024;
+                    const r = parseInt(document.getElementById(`param_${algo}_r`).value) || 8;
+                    const p = parseInt(document.getElementById(`param_${algo}_p`).value) || 1;
+                    result = await scrypt({
+                        password: input,
+                        salt: 'static_salt',
+                        costFactor: N,
+                        blockSize: r,
+                        parallelism: p,
+                        hashLength: 32
+                    });
+                } else if (algo.startsWith('Argon2')) {
+                    const iterations = parseInt(document.getElementById(`param_${algo}_iterations`).value) || 3;
+                    const memory = parseInt(document.getElementById(`param_${algo}_memory`).value) || 512;
+                    const parallelism = parseInt(document.getElementById(`param_${algo}_parallelism`).value) || 1;
+                    
+                    const argonFn = algo === 'Argon2id' ? argon2id : 
+                                   algo === 'Argon2i' ? argon2i : argon2d;
+                    
+                    result = await argonFn({
+                        password: input,
+                        salt: 'static_salt_demo',
+                        iterations,
+                        memorySize: memory,
+                        parallelism,
+                        hashLength: 32,
+                        outputType: 'encoded'
+                    });
+                }
+
+                outputEl.textContent = result;
+                showNotification(`${algo} computed`);
+            } catch (error) {
+                outputEl.textContent = 'Error: ' + error.message;
+                console.error(`${algo} error:`, error);
+            }
+        }
+
+        function copyHash(algo) {
+            const hash = document.getElementById(`hash_${algo}`).textContent;
+            if (hash === '-' || hash === 'Error') {
+                showNotification('No hash to copy');
+                return;
+            }
+            navigator.clipboard.writeText(hash).then(() => {
+                showNotification(`${algo} copied`);
+            });
+        }
+
+        function copyConfigHash(algo) {
+            const hash = document.getElementById(`config_${algo}`).textContent;
+            if (!hash || hash.includes('Click') || hash.includes('Computing') || hash.startsWith('Error')) {
+                showNotification('Generate hash first');
+                return;
+            }
+            navigator.clipboard.writeText(hash).then(() => {
+                showNotification(`${algo} copied`);
+            });
+        }
+
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 2000);
+        }
+
+        // Auto-hash on input with debounce
+        let debounceTimer;
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeTables();
+            document.getElementById('inputText').addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(hashAllInstant, 200);
+            });
+            showNotification('Ready');
+        });
+    </script>
+</body>
+</html>
